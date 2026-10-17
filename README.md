@@ -1,4 +1,4 @@
-# Концепция проекта «Robot Emulator MODIFICATED» (v5.0) / REM
+# Проект «Robot Emulator MODIFICATED» (v5.0) / REM
 
  - Название: REM (Robot Emulator MODIFICATED)
  - Версия проекта: 5.0 (Концепт)
