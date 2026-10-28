@@ -6,10 +6,6 @@
 //#include "varibles.h"
 //#include "functions.h"
 
-/*
-Ядро запускаем после браузера во избежании проблем с совместимостью.
-*/
-
 using namespace std;
 
 /*
@@ -22,18 +18,74 @@ sendersys> - доступ к системе отправки (4)
 robot> - доступ к роботу (5)
 pult> - доступ к пульту (6)
 test> - тестовый режим системы (7)
-*/  
+*/
 
 // Системные переменные
 bool system_is_working = true;
-int work_mode = 7;
+int work_mode = 0;
 
 string input_console_data = "f";
 string last_command = "";
 // переменные
 
 
+// ===============================================================
+// МОДУЛЬ: enum + command_code()
+// ===============================================================
+enum CommandCode {
+    CMD_UNKNOWN   = 0,
+    CMD_REM_SYS   = 1,
+    CMD_MODE_TEST = 2
+};
 
+int command_code(const string& cmd) {
+    if (cmd == "rem_sys")   return CMD_REM_SYS;
+    if (cmd == "mode_test") return CMD_MODE_TEST;
+    return CMD_UNKNOWN;
+}
+
+
+// ===============================================================
+// ОБРАБОТЧИКИ КОМАНД (вынесены из switch)
+// ===============================================================
+
+// rem_sys — рисует арт
+void handle_rem_sys() {
+    ofstream out("buffer_console_output.txt");
+    out << "       ______________________________________\n";
+    out << "     /  ##################################  /\n";
+    out << "    /   ##  ######    ######               /\n";
+    out << "   /    ##  ##   ##   ##                   /\n";
+    out << "  /     ##  ######    ######              /\n";
+    out << " /      ##  ##  ##    ##                  /\n";
+    out << "/       ##  ##   ##   ######              /\n";
+    out << "\\       #################################/\n";
+    out << " \\     / M O D I F I C A T E D          /\n";
+    out << "  \\___/________________________________/\n";
+}
+
+// mode_test — переключает режим на test
+void handle_mode_test() {
+    work_mode = 7;
+    ofstream wm("work_mode.txt");
+    wm << "test";
+    wm.close();
+
+    ofstream out("buffer_console_output.txt");
+    out << "Mode was changed to TEST\n";
+}
+
+// неизвестная команда
+void handle_unknown(const string& command) {
+    ofstream out("buffer_console_output.txt");
+    out << "Command not found: " << command << "\n";
+    out << "Check that the input is correct.\n";
+}
+
+
+// ===============================================================
+// main
+// ===============================================================
 int main(){
     ofstream start_kernel_message("buffer_console_output.txt");
 
@@ -47,97 +99,46 @@ int main(){
     start_kernel_message << "===================== Contact information: daniel8.8@mail.ru =====================" << endl << endl << endl << endl;
     start_kernel_message.close();
 
-    if (work_mode == 0){ // основной режим
-            ofstream work_mode_0("work_mode.txt");
-            work_mode_0 << "main";
-            work_mode_0.close();
+    // --- switch по work_mode ---
+    switch (work_mode) {
+        case 0: { ofstream f("work_mode.txt"); f << "main";      break; }
+        case 1: { ofstream f("work_mode.txt"); f << "core";      break; }
+        case 2: { ofstream f("work_mode.txt"); f << "browser";   break; }
+        case 3: { ofstream f("work_mode.txt"); f << "buffersys"; break; }
+        case 4: { ofstream f("work_mode.txt"); f << "sendersys"; break; }
+        case 5: { ofstream f("work_mode.txt"); f << "robot";     break; }
+        case 6: { ofstream f("work_mode.txt"); f << "pult";      break; }
+        case 7: { ofstream f("work_mode.txt"); f << "test";      break; }
     }
-    else if (work_mode == 1){ // ядро режим
-        ofstream work_mode_1("work_mode.txt");
-        work_mode_1 << "core";
-        work_mode_1.close();
-    }
-    else if (work_mode == 2){ // браузер режим
-        ofstream work_mode_2("work_mode.txt");
-        work_mode_2 << "browser";
-        work_mode_2.close();
-    }
-    else if (work_mode == 3){ // буфер режим
-        ofstream work_mode_3("work_mode.txt");
-        work_mode_3 << "buffersys";
-        work_mode_3.close();
-    }
-    else if (work_mode == 4){ // отпрака режим
-        ofstream work_mode_4("work_mode.txt");
-        work_mode_4 << "sendersys";
-        work_mode_4.close();
-    }
-    else if (work_mode == 5){ // робот режим
-        ofstream work_mode_5("work_mode.txt");
-        work_mode_5 << "robot";
-        work_mode_5.close();
-    }
-    else if (work_mode == 6){ // пульт режим
-        ofstream work_mode_6("work_mode.txt");
-        work_mode_6 << "pult";
-        work_mode_6.close();
-    }
-    else if (work_mode == 7){ // тест режим
-        ofstream work_mode_7("work_mode.txt");
-        work_mode_7 << "test";
-        work_mode_7.close();
-    }
-    
 
     while(system_is_working == true){
-        //cout << "Программа работает" << endl;
-    string command;
-    bool got_command = false;
+        string command;
+        bool got_command = false;
 
-    {
-        ifstream input_file("buffer_console_input.txt");
-        if (getline(input_file, command)) {
-            got_command = true;
-            //cout << "[DEBUG] прочитал: '" << command << "'" << endl;
+        {
+            ifstream input_file("buffer_console_input.txt");
+            if (getline(input_file, command)) {
+                got_command = true;
+            }
         }
-    }
 
-    if (got_command) {
-        ofstream clear_input("buffer_console_input.txt", ios::trunc);
-        clear_input.close();
-        //cout << "[DEBUG] файл очищен" << endl;
+        if (got_command) {
+            ofstream clear_input("buffer_console_input.txt", ios::trunc);
+            clear_input.close();
 
-        if (command == "rem_sys"){
-            //cout << "[DEBUG] команда rem_sys, пишу арт" << endl;
-            ofstream rem_sys_command_output("buffer_console_output.txt");
-            rem_sys_command_output << "       ______________________________________\n";
-            rem_sys_command_output << "     /  ##################################  /\n";
-            rem_sys_command_output << "    /   ##  ######    ######               /\n";
-            rem_sys_command_output << "   /    ##  ##   ##   ##                   /\n";
-            rem_sys_command_output << "  /     ##  ######    ######              /\n";
-            rem_sys_command_output << " /      ##  ##  ##    ##                  /\n";
-            rem_sys_command_output << "/       ##  ##   ##   ######              /\n";
-            rem_sys_command_output << "\\       #################################/\n";
-            rem_sys_command_output << " \\     / M O D I F I C A T E D          /\n";
-            rem_sys_command_output << "  \\___/________________________________/\n";
-            rem_sys_command_output.close();
+            // --- switch по коду команды: 6 строк ---
+            switch (command_code(command)) {
+                case CMD_REM_SYS:   handle_rem_sys();        break;
+                case CMD_MODE_TEST: handle_mode_test();      break;
+                default:            handle_unknown(command); break;
+            }
 
             last_command = command;
             command = "";
         }
-        else{
-            ofstream CONMAND_NOT_FOUND_output("buffer_console_output.txt");
-            CONMAND_NOT_FOUND_output << "Command not found: " << command << "\n";
-            CONMAND_NOT_FOUND_output << "Check that the input is correct.\n";
-            CONMAND_NOT_FOUND_output.close();
 
-            last_command = command;
-            command = "";
-        }
+        this_thread::sleep_for(chrono::milliseconds(100));
     }
-
-    this_thread::sleep_for(chrono::milliseconds(100));
-}
 
     return 0;
 }
