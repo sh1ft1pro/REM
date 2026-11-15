@@ -12,7 +12,7 @@ def find_arduino_port():
     for p in ports:
         desc = p.description.lower()
         # Ищем Ардуино или популярные китайские чипы (CH340/CH341)
-        if "arduino" in desc or "ch340" in desc or "ch341" in desc or "usb-serial" in desc:
+        if "arduino" in desc or "ch340" in desc or "ch341" in desc or "usb-serial" in desc or "usb" in desc:
             return p.device
     return None
 
