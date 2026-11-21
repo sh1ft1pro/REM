@@ -33,9 +33,10 @@ string last_command = "";
 // МОДУЛЬ: enum + command_code()
 // ===============================================================
 enum CommandCode {
-    CMD_UNKNOWN   = 0,
-    CMD_REM_SYS   = 1,
-    CMD_MODE_TEST = 2
+    CMD_UNKNOWN   = 0, // функция включения базового режима
+    CMD_REM_SYS   = 1, // функция команды rem sys (вывод приветственного сообщения
+    )
+    CMD_MODE_TEST = 2 // функция включения режима отладки
 };
 
 int command_code(const string& cmd) {
