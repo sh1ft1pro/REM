@@ -68,26 +68,38 @@ pygame.display.set_icon(icon)
 
 speed = 20
 
+"""
+def find_arduino_port():
+    ports = serial.tools.list_ports.comports()
+    
+    print("=== Поиск Arduino ===")
+    for p in ports:
+        print(f" - {p.device} ({p.description})")
+        
+    for p in ports:
+        desc = p.description.lower()
+        # Ищем Ардуино или популярные китайские чипы (CH340/CH341)
+        if "arduino" in desc or "ch340" in desc or "ch341" in desc or "usb-serial" in desc or "usb" in desc:
+            return p.device
+    return None
+"""
 
 ports = list(serial.tools.list_ports.comports())
-number_of_ports = len(ports)
-print(number_of_ports)
-counter = 0
+ser_port = None  # Изначально порт не найден
 
 for p in ports:
-    if "Arduino" in p.description:
-        print("Arduino Found!")
-        print("Connecting...")
-        print(p.device)
-        break
-    counter += 1
+    desc = p.description.lower()
+    if "arduino" in desc or "ch340" in desc or "ch341" in desc or "usb-serial" in desc or "usb" in desc:
+        ser_port = p.device
+        break  # Нашли плату — дальше искать не нужно
 
-if (counter == number_of_ports):
-   messagebox.showinfo('Ошибка', 'Плата Arduino не найдена!')
-   sys.exit()
+if ser_port is None:  # Если после цикла переменная так и осталась пустой
+    messagebox.showinfo('Ошибка', 'Плата Arduino не найдена!')
+    sys.exit()
+
 
 # настройка порта
-ser_port = p.device
+#ser_port = p.device
 
 SerialObj = serial.Serial(ser_port)
 SerialObj.baudrate = 9600
