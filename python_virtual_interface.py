@@ -11,6 +11,7 @@ import time
 from tkinter import *
 from tkinter import messagebox
 
+import keyboard
 
 pygame.init()
 
@@ -23,15 +24,19 @@ programm_run = True
 
 x = 30
 y = 30
+speed = 1
 
-flag_left = False
-flag_right = False
+
+#keyboard
+esc_press = 0
+enter_press = 0
+backspace_press = 0
 
 robot = pygame.image.load('robot_new.png')
 bg = pygame.image.load("bg_new.png")
 
-system_starting = pygame.image.load('starting.png')
-icon = pygame.image.load("icon_new.jpg")
+system_starting = pygame.image.load('starting_new.png')
+icon = pygame.image.load("icon_new.png")
 
 screen.fill([255, 255, 255])
 screen.blit(system_starting, (0, 0))
@@ -40,24 +45,6 @@ pygame.display.flip()
 pygame.display.set_caption("Robot emulator MODIFICATED")
 pygame.display.set_icon(icon)
 
-
-speed = 20
-
-"""
-def find_arduino_port():
-    ports = serial.tools.list_ports.comports()
-    
-    print("=== Поиск Arduino ===")
-    for p in ports:
-        print(f" - {p.device} ({p.description})")
-        
-    for p in ports:
-        desc = p.description.lower()
-        # Ищем Ардуино или популярные китайские чипы (CH340/CH341)
-        if "arduino" in desc or "ch340" in desc or "ch341" in desc or "usb-serial" in desc or "usb" in desc:
-            return p.device
-    return None
-"""
 
 ports = list(serial.tools.list_ports.comports())
 ser_port = None  # Изначально порт не найден
@@ -70,7 +57,7 @@ for p in ports:
 
 if ser_port is None:  # Если после цикла переменная так и осталась пустой
     messagebox.showinfo('Ошибка', 'Плата Arduino не найдена!')
-    sys.exit()
+    #sys.exit()
 
 
 # настройка порта
@@ -109,61 +96,66 @@ while programm_run:
     with open("pult_sender_sys_output.txt", "r", encoding="utf-8") as file:
         x_read, y_read, left, right = [line.strip() for line in file]
 
-
-    #x_read = SerialObj.readline().decode('utf-8').strip()
-    #y_read = SerialObj.readline().decode('utf-8').strip()
-    #left = SerialObj.readline().decode('utf-8').strip()
-    #right = SerialObj.readline().decode('utf-8').strip()
-    
-
-    if (x_read == "1"):
-        x += speed
-    elif (x_read == "0"):
-        x -= speed
-    if (y_read == "1"):
-        y += speed
-    elif (y_read == "0"):
+    # KEYBOARD
+    if keyboard.is_pressed('w'):
         y -= speed
 
+    # Движение назад
+    if keyboard.is_pressed('s'):
+        y += speed
 
-    if ((left == "1") and (right == "0")  and flag_work == True):
-        flag_left = True
-        flag_right = False
+    # Краб вправо
+    if keyboard.is_pressed('a'):
+        x -= speed
 
-        flag_work = False
+    # Краб влево
+    if keyboard.is_pressed('d'):
+        x += speed
 
-
-    elif ((left == "0") and (right == "1") and flag_work == True):
-        flag_right = True
-        flag_left = False
-
-        flag_work = False
-
-
-    elif ((left == "0") and (right == "0")):
-        lag_left = False
-        flag_right = False
-
-
-    if ((left == "1") and (right == "1")):
-        lag_left = False
-        flag_right = False
-
-        flag_work = True
-
-
-
-
-    if ((flag_left == True) and (flag_right == False)):
+    # Поворот влево (angle)
+    if keyboard.is_pressed('left'):
         robot = pygame.transform.rotate(robot, 90)
-        flag_right = False
-        flag_left = False
 
-
-    elif ((flag_left == False) and (flag_right == True)):
+    # Поворот вправо (angle)
+    if keyboard.is_pressed('right'):
         robot = pygame.transform.rotate(robot, -90)
-        flag_right = False
-        flag_left = False
+
+    # Вывод текущей позиции
+    if keyboard.is_pressed('p'):
+        pass
+
+    # Возвращение на начальную позицию
+    if keyboard.is_pressed('r'):
+        pass
+
+    # Вывод справки
+    if keyboard.is_pressed('tab'):
+        pass
+
+    # Экстренная остановка всей системы
+    if keyboard.is_pressed('space'):
+        pass
+
+    # Загрузить реальный код (2 нажатия)
+    if keyboard.is_pressed('enter'):
+        enter_press += 1
+        if enter_press == 2:
+            enter_press = 0
+            pass
+
+    # Сбросить то, что уже проехал (2 нажатия)
+    if keyboard.is_pressed('backspace'):
+        backspace_press += 1
+        if backspace_press == 2:
+            backspace_press = 0
+            pass
+
+    # Выйти из программы (2 нажатия)
+    if keyboard.is_pressed('esc'):
+        esc_press += 1
+        if esc_press == 2:
+            break
+
 
     screen.fill([255, 255, 255])
 
