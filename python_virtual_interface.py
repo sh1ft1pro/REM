@@ -1,4 +1,6 @@
+import os
 import sys
+import json
 import math
 import time
 import copy
@@ -7,7 +9,7 @@ import pygame
 import serial
 import serial.tools.list_ports
 import keyboard
-from tkinter import Tk, messagebox
+from tkinter import Tk
 
 pygame.init()
 pygame.font.init()
@@ -25,78 +27,59 @@ try:
 except Exception:
     pass
 
+# Настройки графики Source 2
+graphics_settings = {
+    "mode_3d": False,
+    "antialiasing": True,
+    "hd_supersample": True
+}
+
 # =========================================================================
-# 1. ЗАСТАВКА В СТИЛЕ VALVE -> CS2 (ТУМАН)
+# 1. ЗАСТАВКА VALVE -> CS2 (ЧИСТАЯ НАДПИСЬ С ВЫЦВЕТАНИЕМ, БЕЗ ТУМАНА)
 # =========================================================================
-def play_intro_animation():
+def play_intro_cs2():
     clock_intro = pygame.time.Clock()
     font_valve = pygame.font.SysFont("impact", 76)
     font_cs = pygame.font.SysFont("arial", 46, bold=True)
 
-    # Этап 1: Красная надпись "Team BB" на черном фоне (2 секунды)
-    start_t = pygame.time.get_ticks()
-    while pygame.time.get_ticks() - start_t < 2000:
+    # Этап 1: Красная надпись Team BB (2 сек)
+    t0 = pygame.time.get_ticks()
+    while pygame.time.get_ticks() - t0 < 2000:
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+        el = pygame.time.get_ticks() - t0
         screen.fill((0, 0, 0))
-        txt_bb = font_valve.render("Team BB", True, (215, 25, 25))
-        rect_bb = txt_bb.get_rect(center=(SCR_W // 2, SCR_H // 2))
-        # Легкое появление/затухание
-        elapsed = pygame.time.get_ticks() - start_t
-        alpha = 255
-        if elapsed < 300:
-            alpha = int(255 * (elapsed / 300))
-        elif elapsed > 1600:
-            alpha = int(255 * ((2000 - elapsed) / 400))
-        txt_bb.set_alpha(max(0, min(255, alpha)))
-        screen.blit(txt_bb, rect_bb)
+        txt = font_valve.render("Team BB", True, (215, 25, 25))
+        alpha = int(255 * min(1.0, el / 300.0)) if el < 1600 else int(255 * max(0.0, (2000 - el) / 400.0))
+        txt.set_alpha(alpha)
+        screen.blit(txt, txt.get_rect(center=(SCR_W // 2, SCR_H // 2)))
         pygame.display.flip()
         clock_intro.tick(60)
 
-    # Этап 2: Появление "Robot emulator MODIFICATED" сквозь дымку/туман (2.2 секунды)
-    fog_particles = [
-        [random.randint(-100, SCR_W + 100), random.randint(150, 450), random.randint(90, 180), random.uniform(-1.5, 1.5)]
-        for _ in range(35)
-    ]
-    start_t2 = pygame.time.get_ticks()
-    while pygame.time.get_ticks() - start_t2 < 2200:
+    # Этап 2: Экран в стиле CS2 (оранжево-темный градиент и логотип)
+    t1 = pygame.time.get_ticks()
+    while pygame.time.get_ticks() - t1 < 2000:
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-        elapsed = pygame.time.get_ticks() - start_t2
-        prog = min(1.0, elapsed / 2200.0)
+        el = pygame.time.get_ticks() - t1
+        prog = min(1.0, el / 2000.0)
+        screen.fill((18, 22, 29))
 
-        # Фон плавно переходит из черного в темно-синий CS2
-        bg_r = int(22 * prog)
-        bg_g = int(27 * prog)
-        bg_b = int(36 * prog)
-        screen.fill((bg_r, bg_g, bg_b))
+        # Фирменная оранжевая полоса-акцент CS2
+        bar_w = int(620 * min(1.0, prog * 1.5))
+        pygame.draw.rect(screen, (230, 126, 34), (SCR_W // 2 - bar_w // 2, SCR_H // 2 + 38, bar_w, 4))
 
-        # Оранжево-синий градиентный акцент как в интро CS2
-        glow = pygame.Surface((SCR_W, SCR_H), pygame.SRCALPHA)
-        pygame.draw.circle(glow, (230, 126, 34, int(55 * math.sin(prog * math.pi))), (SCR_W // 2, SCR_H // 2), 260)
-        screen.blit(glow, (0, 0))
-
-        txt_title = font_cs.render("Robot emulator MODIFICATED", True, (240, 245, 255))
-        txt_title.set_alpha(int(255 * min(1.0, prog * 1.4)))
-        screen.blit(txt_title, txt_title.get_rect(center=(SCR_W // 2, SCR_H // 2)))
-
-        # Слои тумана, рассеивающиеся в стороны
-        fog_alpha = int(110 * (1.0 - prog))
-        if fog_alpha > 2:
-            for fp in fog_particles:
-                fp[0] += fp[3] * 2.5
-                f_surf = pygame.Surface((fp[2] * 2, fp[2]), pygame.SRCALPHA)
-                pygame.draw.ellipse(f_surf, (180, 195, 215, fog_alpha), (0, 0, fp[2] * 2, fp[2]))
-                screen.blit(f_surf, (fp[0] - fp[2], fp[1] - fp[2] // 2))
-
+        txt2 = font_cs.render("Robot emulator MODIFICATED", True, (240, 245, 255))
+        txt2.set_alpha(int(255 * min(1.0, prog * 1.6)))
+        screen.blit(txt2, txt2.get_rect(center=(SCR_W // 2, SCR_H // 2)))
         pygame.display.flip()
         clock_intro.tick(60)
 
-play_intro_animation()
+play_intro_cs2()
 
 # =========================================================================
 # 2. БЕЗОПАСНОЕ ПОДКЛЮЧЕНИЕ ARDUINO
@@ -124,56 +107,64 @@ font_btn = pygame.font.SysFont("arial", 30, bold=True)
 font_hud = pygame.font.SysFont("arial", 14, bold=True)
 
 # =========================================================================
-# 3. БАЗОВЫЕ СПРАЙТЫ И ХРАНИЛИЩЕ КОНФИГУРАЦИЙ (РОБОТЫ, ПУЛЬТЫ, ПОЛЯ)
+# 3. HD-ОТРИСОВКА СПРАЙТОВ (СУПЕРСЭМПЛИНГ БЕЗ ПИКСЕЛЕЙ)
 # =========================================================================
-def make_wheel_surface(wheel_type="normal", is_left=True, w=46, h=42):
-    surf = pygame.Surface((w, h), pygame.SRCALPHA)
-    wheel_y = 0 if is_left else h - 16
-    motor_y = 16 if is_left else 4
-    # Желтый мотор-редуктор
-    pygame.draw.rect(surf, (240, 195, 20), (5, motor_y, w - 10, 20), border_radius=2)
-    pygame.draw.rect(surf, (150, 110, 0), (5, motor_y, w - 10, 20), 2, border_radius=2)
+def make_wheel_surface(wheel_type="normal", is_left=True, w=46, h=42, ss=2):
+    sw, sh = w * ss, h * ss
+    surf = pygame.Surface((sw, sh), pygame.SRCALPHA)
+    wheel_y = 0 if is_left else sh - 16 * ss
+    motor_y = 16 * ss if is_left else 4 * ss
+    pygame.draw.rect(surf, (240, 195, 20), (5 * ss, motor_y, (w - 10) * ss, 20 * ss), border_radius=2 * ss)
+    pygame.draw.rect(surf, (150, 110, 0), (5 * ss, motor_y, (w - 10) * ss, 20 * ss), 2 * ss, border_radius=2 * ss)
     if wheel_type == "normal":
-        pygame.draw.rect(surf, (30, 32, 38), (0, wheel_y, w, 16), border_radius=4)
+        pygame.draw.rect(surf, (30, 32, 38), (0, wheel_y, sw, 16 * ss), border_radius=4 * ss)
     elif wheel_type == "omni":
-        pygame.draw.rect(surf, (165, 175, 190), (0, wheel_y, w, 16), border_radius=3)
-        for rx in range(4, w - 4, 8):
-            pygame.draw.rect(surf, (25, 28, 32), (rx, wheel_y - 1, 5, 18), border_radius=2)
+        pygame.draw.rect(surf, (165, 175, 190), (0, wheel_y, sw, 16 * ss), border_radius=3 * ss)
+        for rx in range(4 * ss, (w - 4) * ss, 8 * ss):
+            pygame.draw.rect(surf, (25, 28, 32), (rx, wheel_y - ss, 5 * ss, 18 * ss), border_radius=2 * ss)
     else:
-        # Только мотор без колеса
-        pygame.draw.rect(surf, (210, 215, 225), (w // 2 - 3, wheel_y + 6, 6, 10))
+        pygame.draw.rect(surf, (210, 215, 225), (sw // 2 - 3 * ss, wheel_y + 6 * ss, 6 * ss, 10 * ss))
     return surf
 
 def render_robot_config_surface(cfg, scale=1.0):
+    ss = 2 if graphics_settings["hd_supersample"] else 1
     base_size = 180
-    surf = pygame.Surface((base_size, base_size), pygame.SRCALPHA)
-    cx, cy = base_size // 2, base_size // 2
+    surf = pygame.Surface((base_size * ss, base_size * ss), pygame.SRCALPHA)
+    cx, cy = (base_size * ss) // 2, (base_size * ss) // 2
     shape = cfg.get("shape", "square")
+    font_m = pygame.font.SysFont("arial", 12 * ss, bold=True)
 
     if shape == "square":
-        pygame.draw.rect(surf, (200, 220, 240, 200), (cx - 48, cy - 48, 96, 96), border_radius=10)
-        pygame.draw.rect(surf, (100, 130, 160), (cx - 48, cy - 48, 96, 96), 3, border_radius=10)
-        pygame.draw.rect(surf, (255, 75, 75), (cx + 34, cy - 10, 10, 20))
+        pygame.draw.rect(surf, (200, 220, 240, 215), (cx - 48 * ss, cy - 48 * ss, 96 * ss, 96 * ss), border_radius=10 * ss)
+        pygame.draw.rect(surf, (100, 130, 160), (cx - 48 * ss, cy - 48 * ss, 96 * ss, 96 * ss), 3 * ss, border_radius=10 * ss)
+        pygame.draw.rect(surf, (255, 75, 75), (cx + 34 * ss, cy - 10 * ss, 10 * ss, 20 * ss), border_radius=2 * ss)
     elif shape == "circle":
-        pygame.draw.circle(surf, (210, 230, 245, 200), (cx, cy), 54)
-        pygame.draw.circle(surf, (130, 160, 190), (cx, cy), 54, 3)
-        pygame.draw.polygon(surf, (255, 75, 75), [(cx + 48, cy), (cx + 34, cy - 9), (cx + 34, cy + 9)])
-    else:  # rect (4WD)
-        pygame.draw.rect(surf, (200, 220, 240, 200), (cx - 62, cy - 40, 124, 80), border_radius=12)
-        pygame.draw.rect(surf, (110, 140, 170), (cx - 62, cy - 40, 124, 80), 3, border_radius=12)
-        pygame.draw.polygon(surf, (255, 75, 75), [(cx + 56, cy), (cx + 42, cy - 9), (cx + 42, cy + 9)])
+        pygame.draw.circle(surf, (210, 230, 245, 215), (cx, cy), 54 * ss)
+        pygame.draw.circle(surf, (130, 160, 190), (cx, cy), 54 * ss, 3 * ss)
+        pygame.draw.polygon(surf, (255, 75, 75), [(cx + 48 * ss, cy), (cx + 34 * ss, cy - 9 * ss), (cx + 34 * ss, cy + 9 * ss)])
+    else:
+        pygame.draw.rect(surf, (200, 220, 240, 215), (cx - 62 * ss, cy - 40 * ss, 124 * ss, 80 * ss), border_radius=12 * ss)
+        pygame.draw.rect(surf, (110, 140, 170), (cx - 62 * ss, cy - 40 * ss, 124 * ss, 80 * ss), 3 * ss, border_radius=12 * ss)
+        pygame.draw.polygon(surf, (255, 75, 75), [(cx + 56 * ss, cy), (cx + 42 * ss, cy - 9 * ss), (cx + 42 * ss, cy + 9 * ss)])
 
     for m in cfg.get("motors", []):
-        w_surf = make_wheel_surface(m["wheel"], m["y"] < 0)
-        m_rect = w_surf.get_rect(center=(cx + m["x"], cy + m["y"]))
+        w_surf = make_wheel_surface(m["wheel"], m["y"] < 0, ss=ss)
+        ang_w = m.get("angle", 0)
+        if ang_w != 0:
+            w_surf = pygame.transform.rotozoom(w_surf, -ang_w, 1.0)
+        m_rect = w_surf.get_rect(center=(cx + m["x"] * ss, cy + m["y"] * ss))
         surf.blit(w_surf, m_rect)
-        # Номер мотора (М1, М2...)
-        num_txt = font_hud.render(f"M{m['id']}", True, (255, 255, 255))
-        pygame.draw.circle(surf, (20, 25, 35), m_rect.center, 10)
+        pygame.draw.circle(surf, (20, 25, 35), m_rect.center, 11 * ss)
+        pygame.draw.circle(surf, (240, 195, 20), m_rect.center, 11 * ss, max(1, ss))
+        num_txt = font_m.render(f"M{m['id']}", True, (255, 255, 255))
         surf.blit(num_txt, num_txt.get_rect(center=m_rect.center))
 
-    if scale != 1.0:
-        surf = pygame.transform.rotozoom(surf, 0, scale)
+    final_w = max(1, int(base_size * scale))
+    final_h = max(1, int(base_size * scale))
+    if graphics_settings["antialiasing"] or ss > 1:
+        surf = pygame.transform.smoothscale(surf, (final_w, final_h))
+    else:
+        surf = pygame.transform.scale(surf, (final_w, final_h))
     return surf
 
 def generate_base_metal_floor(w, h):
@@ -197,75 +188,109 @@ def generate_base_metal_floor(w, h):
 
 bg_metal_floor = generate_base_metal_floor(SCR_W, SCR_H)
 
-# Списки сохраненных конфигураций (изначально заполнены стартовыми пресетами)
-saved_robots = [
-    {
-        "name": "2WD Квадрат", "shape": "square",
-        "motors": [
-            {"id": 1, "x": -28, "y": -44, "wheel": "normal"},
-            {"id": 2, "x": -28, "y": 44, "wheel": "normal"},
-        ]
-    },
-    {
-        "name": "2WD Круглый", "shape": "circle",
-        "motors": [
-            {"id": 1, "x": -10, "y": -46, "wheel": "normal"},
-            {"id": 2, "x": -10, "y": 46, "wheel": "normal"},
-        ]
-    },
-    {
-        "name": "4WD Вездеход", "shape": "rect",
-        "motors": [
-            {"id": 1, "x": 32, "y": -44, "wheel": "normal"},
-            {"id": 2, "x": 32, "y": 44, "wheel": "normal"},
-            {"id": 3, "x": -32, "y": -44, "wheel": "normal"},
-            {"id": 4, "x": -32, "y": 44, "wheel": "normal"},
-        ]
-    },
-]
+# =========================================================================
+# 4. СОХРАНЕНИЕ И ЗАГРУЗКА КОНФИГУРАЦИЙ В JSON
+# =========================================================================
+CONFIG_FILE = "emulator_configs.json"
 
-saved_remotes = [
-    {
-        "name": "Стандартный WASD",
-        "buttons": [
-            {"x": 70, "y": 40, "key": "w", "label": "W", "motor_id": 0, "dir": 1},   # motor_id=0 -> все моторы
-            {"x": 70, "y": 110, "key": "s", "label": "S", "motor_id": 0, "dir": -1},
-            {"x": 25, "y": 75, "key": "a", "label": "A", "motor_id": -1, "dir": 1},  # -1 -> танковый лево
-            {"x": 115, "y": 75, "key": "d", "label": "D", "motor_id": -2, "dir": 1}, # -2 -> танковый право
-            {"x": 180, "y": 40, "key": "u", "label": "U", "motor_id": 1, "dir": 1},
-            {"x": 180, "y": 110, "key": "j", "label": "J", "motor_id": 1, "dir": -1},
-            {"x": 230, "y": 40, "key": "i", "label": "I", "motor_id": 2, "dir": 1},
-            {"x": 230, "y": 110, "key": "k", "label": "K", "motor_id": 2, "dir": -1},
-        ]
-    }
-]
+DEFAULT_DATA = {
+    "robots": [
+        {
+            "name": "2WD Квадрат", "shape": "square",
+            "motors": [
+                {"id": 1, "x": -28, "y": -44, "wheel": "normal", "angle": 0},
+                {"id": 2, "x": -28, "y": 44, "wheel": "normal", "angle": 0},
+            ]
+        },
+        {
+            "name": "2WD Круглый", "shape": "circle",
+            "motors": [
+                {"id": 1, "x": -10, "y": -46, "wheel": "normal", "angle": 0},
+                {"id": 2, "x": -10, "y": 46, "wheel": "normal", "angle": 0},
+            ]
+        },
+        {
+            "name": "4WD Вездеход", "shape": "rect",
+            "motors": [
+                {"id": 1, "x": 32, "y": -44, "wheel": "normal", "angle": 0},
+                {"id": 2, "x": 32, "y": 44, "wheel": "normal", "angle": 0},
+                {"id": 3, "x": -32, "y": -44, "wheel": "normal", "angle": 0},
+                {"id": 4, "x": -32, "y": 44, "wheel": "normal", "angle": 0},
+            ]
+        },
+        {
+            "name": "Omni-X (45°)", "shape": "square",
+            "motors": [
+                {"id": 1, "x": 34, "y": -34, "wheel": "omni", "angle": -45},
+                {"id": 2, "x": 34, "y": 34, "wheel": "omni", "angle": 45},
+                {"id": 3, "x": -34, "y": -34, "wheel": "omni", "angle": 45},
+                {"id": 4, "x": -34, "y": 34, "wheel": "omni", "angle": -45},
+            ]
+        },
+    ],
+    "remotes": [
+        {
+            "name": "Стандарт + Omni X",
+            "buttons": [
+                {"x": 70, "y": 38, "key": "w", "label": "W", "motor_id": 0, "dir": 1},
+                {"x": 70, "y": 112, "key": "s", "label": "S", "motor_id": 0, "dir": -1},
+                {"x": 26, "y": 75, "key": "a", "label": "A", "motor_id": -1, "dir": 1},
+                {"x": 114, "y": 75, "key": "d", "label": "D", "motor_id": -2, "dir": 1},
+                {"x": 180, "y": 38, "key": "q", "label": "Q", "motor_id": -3, "dir": 1},
+                {"x": 230, "y": 38, "key": "e", "label": "E", "motor_id": -4, "dir": 1},
+                {"x": 180, "y": 112, "key": "u", "label": "U", "motor_id": 1, "dir": 1},
+                {"x": 230, "y": 112, "key": "i", "label": "I", "motor_id": 2, "dir": 1},
+            ]
+        }
+    ],
+    "fields": [
+        {"name": "Пустой полигон", "objects": []},
+        {
+            "name": "Тренировочная трасса",
+            "objects": [
+                {"x": 220, "y": 140, "w": 40, "h": 260, "type": "wall"},
+                {"x": 740, "y": 180, "w": 40, "h": 260, "type": "wall"},
+                {"x": 460, "y": 260, "w": 45, "h": 45, "type": "box"},
+                {"x": 530, "y": 310, "w": 45, "h": 45, "type": "box"},
+            ]
+        }
+    ]
+}
 
-saved_fields = [
-    {"name": "Пустой полигон", "objects": []},
-    {
-        "name": "Тренировочная трасса",
-        "objects": [
-            {"x": 220, "y": 140, "w": 40, "h": 260, "type": "wall"},
-            {"x": 740, "y": 180, "w": 40, "h": 260, "type": "wall"},
-            {"x": 460, "y": 260, "w": 45, "h": 45, "type": "box"},
-            {"x": 530, "y": 310, "w": 45, "h": 45, "type": "box"},
-        ]
-    }
-]
+def load_all_configs():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data["robots"], data["remotes"], data["fields"]
+        except Exception:
+            pass
+    return copy.deepcopy(DEFAULT_DATA["robots"]), copy.deepcopy(DEFAULT_DATA["remotes"]), copy.deepcopy(DEFAULT_DATA["fields"])
 
-# Активные выбранные конфигурации для запуска на поле
+def save_all_configs():
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump({"robots": saved_robots, "remotes": saved_remotes, "fields": saved_fields}, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print("Ошибка сохранения JSON:", e)
+
+saved_robots, saved_remotes, saved_fields = load_all_configs()
 active_robot_idx = 0
 active_remote_idx = 0
 active_field_idx = 0
 
 # =========================================================================
-# 4. ПЕРЕМЕННЫЕ СОСТОЯНИЙ ИНТЕРФЕЙСА И КОНСТРУКТОРОВ (TINKERCAD STYLE)
+# 5. ПЕРЕМЕННЫЕ МЕНЮ, КОНСТРУКТОРОВ И SOURCE 2 3D-РЕНДЕРА
 # =========================================================================
 programm_run = True
 game_state = "MENU"  # "MENU", "LOADING", "GAME"
-menu_tab = "PLAY"    # "PLAY", "CFG_ROBOT", "CFG_REMOTE", "CFG_FIELD", "MANAGER"
+menu_tab = "HOME"    # "HOME", "PLAY", "CFG_ROBOT", "CFG_REMOTE", "CFG_FIELD", "MANAGER", "SETTINGS"
 
-# Рабочие буферы для 3 конструкторов
+rot3d_x = 0.55
+rot3d_y = -0.65
+is_dragging_3d = False
+last_mouse_3d = (0, 0)
+
 draft_robot = copy.deepcopy(saved_robots[0])
 selected_draft_motor = None
 drag_motor_idx = None
@@ -279,16 +304,12 @@ draft_field = {"name": "Мое Поле", "objects": []}
 selected_field_obj = None
 drag_field_obj = None
 
-# Уведомление "Сохранено!"
 toast_text = ""
 toast_timer = 0
-
-# Анимация кнопки GO и загрузки
 go_shimmer_x = 0.0
 load_start_ticks = 0
 LOADING_DURATION_MS = 2000
 
-# Игровые переменные поля
 robot_pos = pygame.math.Vector2(500, 300)
 robot_angle = 0.0
 live_field_objects = []
@@ -313,6 +334,166 @@ def draw_tinkercad_grid(surface, rect):
         pygame.draw.line(surface, col, (rect.left, gy), (rect.right, gy), 1)
     pygame.draw.rect(surface, (140, 165, 190), rect, 2, border_radius=8)
 
+def make_3d_box(cx, cy, cz, sx, sy, sz, color, yaw_deg=0):
+    hx, hy, hz = sx / 2, sy / 2, sz / 2
+    rad = math.radians(yaw_deg)
+    ca, sa = math.cos(rad), math.sin(rad)
+    raw = [
+        (-hx, -hy, -hz), (hx, -hy, -hz), (hx, hy, -hz), (-hx, hy, -hz),
+        (-hx, -hy, hz), (hx, -hy, hz), (hx, hy, hz), (-hx, hy, hz),
+    ]
+    verts = []
+    for vx, vy, vz in raw:
+        rx = vx * ca - vz * sa
+        rz = vx * sa + vz * ca
+        verts.append((cx + rx, cy + vy, cz + rz))
+    faces = [
+        ((0, 1, 2, 3), tuple(max(0, c - 25) for c in color)),
+        ((4, 5, 6, 7), tuple(min(255, c + 20) for c in color)),
+        ((0, 1, 5, 4), tuple(max(0, c - 15) for c in color)),
+        ((2, 3, 7, 6), tuple(max(0, c - 15) for c in color)),
+        ((1, 2, 6, 5), tuple(min(255, c + 10) for c in color)),
+        ((0, 3, 7, 4), tuple(max(0, c - 20) for c in color)),
+    ]
+    return verts, faces
+
+def draw_robot_3d_showcase(surface, center_xy, r_cfg, rx, ry):
+    meshes = []
+    sh = r_cfg.get("shape", "square")
+    if sh == "circle":
+        segs = 16
+        r = 62
+        top_v = [(math.cos(2 * math.pi * i / segs) * r, -5, math.sin(2 * math.pi * i / segs) * r) for i in range(segs)]
+        bot_v = [(math.cos(2 * math.pi * i / segs) * r, 5, math.sin(2 * math.pi * i / segs) * r) for i in range(segs)]
+        faces = [(tuple(range(segs)), (195, 220, 240)), (tuple(range(segs, 2 * segs)), (150, 175, 195))]
+        for i in range(segs):
+            ni = (i + 1) % segs
+            faces.append(((i, ni, ni + segs, i + segs), (165, 190, 215)))
+        meshes.append((top_v + bot_v, faces))
+    elif sh == "rect":
+        meshes.append(make_3d_box(0, 0, 0, 145, 10, 90, (175, 200, 225)))
+    else:
+        meshes.append(make_3d_box(0, 0, 0, 110, 10, 110, (175, 200, 225)))
+
+    meshes.append(make_3d_box(42, -8, 0, 14, 6, 24, (235, 70, 70)))
+    for m in r_cfg.get("motors", []):
+        ang = m.get("angle", 0)
+        meshes.append(make_3d_box(m["x"], 8, m["y"], 38, 20, 20, (235, 190, 25), ang))
+        if m["wheel"] != "none":
+            w_col = (155, 168, 185) if m["wheel"] == "omni" else (35, 38, 44)
+            z_off = -16 if m["y"] < 0 else 16
+            meshes.append(make_3d_box(m["x"], 8, m["y"] + z_off, 50, 50, 16, w_col, ang))
+
+    render_list = []
+    cos_x, sin_x = math.cos(rx), math.sin(rx)
+    cos_y, sin_y = math.cos(ry), math.sin(ry)
+
+    for verts, faces in meshes:
+        proj, z_vals = [], []
+        for vx, vy, vz in verts:
+            x1 = vx * cos_y + vz * sin_y
+            z1 = -vx * sin_y + vz * cos_y
+            y2 = vy * cos_x - z1 * sin_x
+            z2 = vy * sin_x + z1 * cos_x
+            scale = 450 / (450 + z2)
+            proj.append((center_xy[0] + x1 * scale * 1.6, center_xy[1] + y2 * scale * 1.6))
+            z_vals.append(z2)
+        for f_idx, col in faces:
+            avg_z = sum(z_vals[i] for i in f_idx) / len(f_idx)
+            render_list.append((avg_z, [proj[i] for i in f_idx], col))
+
+    render_list.sort(key=lambda it: it[0], reverse=True)
+    for _, pts, col in render_list:
+        pygame.draw.polygon(surface, col, pts)
+        if graphics_settings["antialiasing"]:
+            pygame.draw.aalines(surface, (20, 24, 30), True, pts)
+        else:
+            pygame.draw.polygon(surface, (20, 24, 30), pts, 1)
+
+def render_3d_first_person(surface, r_pos, r_ang_deg, field_objs):
+    w, h = surface.get_size()
+    horizon = h // 2
+    pygame.draw.rect(surface, (24, 30, 40), (0, 0, w, horizon))
+    pygame.draw.rect(surface, (36, 40, 48), (0, horizon, w, h - horizon))
+
+    rad_ang = math.radians(-r_ang_deg)
+    fwd_x, fwd_y = math.cos(rad_ang), math.sin(rad_ang)
+    right_x, right_y = -fwd_y, fwd_x
+    fov_scale = 520.0
+
+    grid_step = 100
+    start_gx = int((r_pos.x - 700) // grid_step) * grid_step
+    start_gy = int((r_pos.y - 700) // grid_step) * grid_step
+    for gx in range(start_gx, start_gx + 1500, grid_step):
+        for gy in range(start_gy, start_gy + 1500, grid_step):
+            dx, dy = gx - r_pos.x, gy - r_pos.y
+            cam_z = dx * fwd_x + dy * fwd_y
+            cam_x = dx * right_x + dy * right_y
+            if cam_z > 20:
+                sx = w // 2 + (cam_x / cam_z) * fov_scale
+                sy = horizon + (38.0 / cam_z) * fov_scale
+                if 0 <= sx < w and horizon <= sy < h:
+                    pygame.draw.circle(surface, (65, 74, 88), (int(sx), int(sy)), 2)
+
+    wall_segments = [
+        ((0, 0), (SCR_W, 0), (70, 80, 95), 75),
+        ((SCR_W, 0), (SCR_W, SCR_H), (60, 70, 85), 75),
+        ((SCR_W, SCR_H), (0, SCR_H), (70, 80, 95), 75),
+        ((0, SCR_H), (0, 0), (60, 70, 85), 75),
+    ]
+    for obj in field_objs:
+        r = obj["rect"]
+        col = (192, 57, 43) if obj["type"] == "wall" else (230, 126, 34)
+        wh = 70 if obj["type"] == "wall" else 42
+        wall_segments.append(((r.left, r.top), (r.right, r.top), col, wh))
+        wall_segments.append(((r.right, r.top), (r.right, r.bottom), tuple(max(0, c - 20) for c in col), wh))
+        wall_segments.append(((r.right, r.bottom), (r.left, r.bottom), col, wh))
+        wall_segments.append(((r.left, r.bottom), (r.left, r.top), tuple(max(0, c - 20) for c in col), wh))
+
+    polys_3d = []
+    near_z = 12.0
+    for (x1, y1), (x2, y2), col, wall_h in wall_segments:
+        dx1, dy1 = x1 - r_pos.x, y1 - r_pos.y
+        dx2, dy2 = x2 - r_pos.x, y2 - r_pos.y
+        z1 = dx1 * fwd_x + dy1 * fwd_y
+        xc1 = dx1 * right_x + dy1 * right_y
+        z2 = dx2 * fwd_x + dy2 * fwd_y
+        xc2 = dx2 * right_x + dy2 * right_y
+
+        if z1 < near_z and z2 < near_z:
+            continue
+        if z1 < near_z:
+            t = (near_z - z1) / (z2 - z1)
+            xc1 = xc1 + t * (xc2 - xc1)
+            z1 = near_z
+        elif z2 < near_z:
+            t = (near_z - z2) / (z1 - z2)
+            xc2 = xc2 + t * (xc1 - xc2)
+            z2 = near_z
+
+        sx1 = w // 2 + (xc1 / z1) * fov_scale
+        sx2 = w // 2 + (xc2 / z2) * fov_scale
+        bot1 = horizon + (38.0 / z1) * fov_scale
+        top1 = horizon - ((wall_h - 38.0) / z1) * fov_scale
+        bot2 = horizon + (38.0 / z2) * fov_scale
+        top2 = horizon - ((wall_h - 38.0) / z2) * fov_scale
+
+        avg_dist = (z1 + z2) / 2.0
+        shade = max(0.35, min(1.0, 1.0 - avg_dist / 1100.0))
+        shaded_col = tuple(int(c * shade) for c in col)
+        polys_3d.append((avg_dist, [(sx1, top1), (sx2, top2), (sx2, bot2), (sx1, bot1)], shaded_col))
+
+    polys_3d.sort(key=lambda item: item[0], reverse=True)
+    for _, pts, col in polys_3d:
+        pygame.draw.polygon(surface, col, pts)
+        if graphics_settings["antialiasing"]:
+            pygame.draw.aalines(surface, (20, 24, 30), True, pts)
+        else:
+            pygame.draw.polygon(surface, (20, 24, 30), pts, 1)
+
+    pygame.draw.polygon(surface, (50, 62, 78), [(w // 2 - 140, h), (w // 2 - 100, h - 55), (w // 2 + 100, h - 55), (w // 2 + 140, h)])
+    pygame.draw.rect(surface, (235, 70, 70), (w // 2 - 25, h - 62, 50, 10), border_radius=3)
+
 # =========================================================================
 # ОСНОВНОЙ ЦИКЛ ПРОГРАММЫ
 # =========================================================================
@@ -330,33 +511,32 @@ while programm_run:
             drag_motor_idx = None
             drag_remote_btn = None
             drag_field_obj = None
+            is_dragging_3d = False
         elif event.type == pygame.KEYDOWN and waiting_key_bind and selected_remote_btn is not None:
             key_name = pygame.key.name(event.key)
             draft_remote["buttons"][selected_remote_btn]["key"] = key_name
             draft_remote["buttons"][selected_remote_btn]["label"] = key_name.upper()[:4]
             waiting_key_bind = False
 
-    # =====================================================================
-    # ЭКРАН 1: ГЛАВНОЕ МЕНЮ И КОНСТРУКТОРЫ
-    # =====================================================================
     if game_state == "MENU":
         screen.fill((22, 27, 36))
 
-        # --- ЛЕВАЯ БОКОВАЯ ПАНЕЛЬ В СТИЛЕ CS:GO (5 КНОПОК) ---
-        nav_w = 72
+        nav_w = 74
         pygame.draw.rect(screen, (15, 19, 26), (0, 0, nav_w, SCR_H))
         pygame.draw.line(screen, (40, 48, 62), (nav_w, 0), (nav_w, SCR_H), 2)
 
         nav_buttons = [
-            {"id": "PLAY", "y": 25, "hint": "Старт"},
-            {"id": "CFG_ROBOT", "y": 100, "hint": "Робот"},
-            {"id": "CFG_REMOTE", "y": 175, "hint": "Пульт"},
-            {"id": "CFG_FIELD", "y": 250, "hint": "Поле"},
-            {"id": "MANAGER", "y": 325, "hint": "Сборки"},
+            {"id": "HOME", "y": 18, "hint": "Главная"},
+            {"id": "PLAY", "y": 94, "hint": "Играть"},
+            {"id": "CFG_ROBOT", "y": 170, "hint": "Робот"},
+            {"id": "CFG_REMOTE", "y": 246, "hint": "Пульт"},
+            {"id": "CFG_FIELD", "y": 322, "hint": "Поле"},
+            {"id": "MANAGER", "y": 398, "hint": "Сборки"},
+            {"id": "SETTINGS", "y": 510, "hint": "Настр."},
         ]
 
         for nb in nav_buttons:
-            r_btn = pygame.Rect(8, nb["y"], 56, 56)
+            r_btn = pygame.Rect(9, nb["y"], 56, 54)
             is_act = (menu_tab == nb["id"])
             is_hov = r_btn.collidepoint(mouse_pos)
             if is_hov and mouse_clicked:
@@ -365,49 +545,87 @@ while programm_run:
 
             if is_act:
                 pygame.draw.rect(screen, (34, 44, 58), r_btn, border_radius=8)
-                pygame.draw.rect(screen, (46, 204, 113), (0, nb["y"] + 8, 4, 40))
+                pygame.draw.rect(screen, (46, 204, 113), (0, nb["y"] + 8, 4, 38))
             elif is_hov:
                 pygame.draw.rect(screen, (26, 33, 44), r_btn, border_radius=8)
 
             cx, cy = r_btn.center
             c_ico = (255, 255, 255) if is_act else (140, 155, 175)
-            if nb["id"] == "PLAY":
-                pygame.draw.circle(screen, c_ico, (cx, cy), 17, 2)
+            if nb["id"] == "HOME":
+                pygame.draw.polygon(screen, c_ico, [(cx, cy - 13), (cx - 13, cy), (cx + 13, cy)], 2)
+                pygame.draw.rect(screen, c_ico, (cx - 9, cy, 18, 12), 2)
+            elif nb["id"] == "PLAY":
+                pygame.draw.circle(screen, c_ico, (cx, cy), 16, 2)
                 pygame.draw.polygon(screen, c_ico, [(cx - 4, cy - 7), (cx - 4, cy + 7), (cx + 8, cy)])
             elif nb["id"] == "CFG_ROBOT":
                 pygame.draw.rect(screen, c_ico, (cx - 11, cy - 7, 22, 16), 2, border_radius=3)
                 pygame.draw.line(screen, c_ico, (cx, cy - 7), (cx, cy - 14), 2)
-                pygame.draw.circle(screen, c_ico, (cx, cy - 15), 2)
                 pygame.draw.circle(screen, c_ico, (cx - 5, cy), 2)
                 pygame.draw.circle(screen, c_ico, (cx + 5, cy), 2)
             elif nb["id"] == "CFG_REMOTE":
                 pygame.draw.rect(screen, c_ico, (cx - 14, cy - 9, 28, 18), 2, border_radius=5)
                 pygame.draw.line(screen, c_ico, (cx - 8, cy - 3), (cx - 8, cy + 3), 2)
                 pygame.draw.line(screen, c_ico, (cx - 11, cy), (cx - 5, cy), 2)
-                pygame.draw.circle(screen, c_ico, (cx + 7, cy - 2), 2)
-                pygame.draw.circle(screen, c_ico, (cx + 10, cy + 2), 2)
+                pygame.draw.circle(screen, c_ico, (cx + 8, cy), 2)
             elif nb["id"] == "CFG_FIELD":
-                pygame.draw.rect(screen, c_ico, (cx - 13, cy - 13, 26, 26), 2)
-                pygame.draw.line(screen, c_ico, (cx - 13, cy), (cx + 13, cy), 1)
-                pygame.draw.line(screen, c_ico, (cx, cy - 13), (cx, cy + 13), 1)
+                pygame.draw.rect(screen, c_ico, (cx - 12, cy - 12, 24, 24), 2)
+                pygame.draw.line(screen, c_ico, (cx - 12, cy), (cx + 12, cy), 1)
+                pygame.draw.line(screen, c_ico, (cx, cy - 12), (cx, cy + 12), 1)
             elif nb["id"] == "MANAGER":
-                pygame.draw.rect(screen, c_ico, (cx - 14, cy - 11, 7, 22), 2)
-                pygame.draw.rect(screen, c_ico, (cx - 3, cy - 11, 7, 22), 2)
-                pygame.draw.rect(screen, c_ico, (cx + 8, cy - 11, 7, 22), 2)
+                for ox in (-11, -2, 7):
+                    pygame.draw.rect(screen, c_ico, (cx + ox, cy - 10, 5, 20), 2)
+            elif nb["id"] == "SETTINGS":
+                pygame.draw.circle(screen, c_ico, (cx, cy), 10, 3)
+                pygame.draw.circle(screen, c_ico, (cx, cy), 3)
 
             lbl = font_hud.render(nb["hint"], True, c_ico)
-            screen.blit(lbl, lbl.get_rect(center=(cx, nb["y"] + 64)))
+            screen.blit(lbl, lbl.get_rect(center=(cx, nb["y"] + 62)))
 
-        work_x = nav_w + 20
+        work_x = nav_w + 22
 
-        # -----------------------------------------------------------------
-        # ВКЛАДКА 1: ГЛАВНЫЙ ЭКРАН ВЫБОРА РОБОТА И КНОПКА GO
-        # -----------------------------------------------------------------
-        if menu_tab == "PLAY":
+        # ВКЛАДКА 0: ГЛАВНОЕ МЕНЮ (3D-РОБОТ С ВРАЩЕНИЕМ МЫШКОЙ)
+        if menu_tab == "HOME":
+            screen.blit(font_title.render("ROBOT EMULATOR MODIFICATED // SOURCE 2", True, (235, 240, 250)), (work_x, 22))
+            screen.blit(font_card.render("Интерактивный 3D-просмотр активного робота (зажмите ЛКМ для вращения)", True, (150, 165, 185)), (work_x, 56))
+
+            view_area = pygame.Rect(work_x, 90, 580, 460)
+            pygame.draw.rect(screen, (28, 34, 46), view_area, border_radius=12)
+            pygame.draw.rect(screen, (48, 58, 76), view_area, 2, border_radius=12)
+
+            if view_area.collidepoint(mouse_pos) and mouse_clicked:
+                is_dragging_3d = True
+                last_mouse_3d = mouse_pos
+
+            if is_dragging_3d and mouse_pressed:
+                dx = mouse_pos[0] - last_mouse_3d[0]
+                dy = mouse_pos[1] - last_mouse_3d[1]
+                rot3d_y += dx * 0.012
+                rot3d_x = max(-1.35, min(1.35, rot3d_x + dy * 0.012))
+                last_mouse_3d = mouse_pos
+            else:
+                rot3d_y += 0.01
+
+            cur_r = saved_robots[active_robot_idx]
+            draw_robot_3d_showcase(screen, view_area.center, cur_r, rot3d_x, rot3d_y)
+
+            stat_box = pygame.Rect(work_x + 600, 90, 280, 340)
+            pygame.draw.rect(screen, (30, 37, 48), stat_box, border_radius=12)
+            screen.blit(font_card.render("АКТИВНАЯ КОНФИГУРАЦИЯ:", True, (46, 204, 113)), (stat_box.x + 18, 110))
+            screen.blit(font_card.render(f"Робот: {cur_r['name']}", True, (240, 245, 250)), (stat_box.x + 18, 150))
+            screen.blit(font_card.render(f"Моторов: {len(cur_r['motors'])} шт.", True, (200, 210, 225)), (stat_box.x + 18, 185))
+            omni_cnt = sum(1 for m in cur_r["motors"] if m["wheel"] == "omni")
+            screen.blit(font_card.render(f"Омни-колес: {omni_cnt} шт.", True, (130, 220, 255)), (stat_box.x + 18, 220))
+            screen.blit(font_card.render(f"Пульт: {saved_remotes[active_remote_idx]['name']}", True, (200, 210, 225)), (stat_box.x + 18, 255))
+            screen.blit(font_card.render(f"Поле: {saved_fields[active_field_idx]['name']}", True, (200, 210, 225)), (stat_box.x + 18, 290))
+            mode_str = "3D (От 1-го лица)" if graphics_settings["mode_3d"] else "2D (Вид сверху)"
+            screen.blit(font_card.render(f"Режим: {mode_str}", True, (240, 195, 20)), (stat_box.x + 18, 335))
+
+        # ВКЛАДКА 1: ВЫБОР РОБОТА (PLAY)
+        elif menu_tab == "PLAY":
             screen.blit(font_title.render("ВЫБОР РОБОТА ДЛЯ ЗАПУСКА", True, (230, 235, 245)), (work_x, 20))
             card_w, card_h = 165, 235
-            for i, r_cfg in enumerate(saved_robots[:4]):
-                cx = work_x + i * (card_w + 15)
+            for i, r_cfg in enumerate(saved_robots[:5]):
+                cx = work_x + i * (card_w + 14)
                 cy = 75
                 c_rect = pygame.Rect(cx, cy, card_w, card_h)
                 is_sel = (active_robot_idx == i)
@@ -415,9 +633,9 @@ while programm_run:
                     active_robot_idx = i
 
                 pygame.draw.rect(screen, (34, 42, 54), c_rect, border_radius=8)
-                r_img = render_robot_config_surface(r_cfg, 0.78)
+                r_img = render_robot_config_surface(r_cfg, 0.8)
                 screen.blit(r_img, r_img.get_rect(center=(cx + card_w // 2, cy + 82)))
-                t_name = font_card.render(r_cfg["name"][:16], True, (235, 240, 245))
+                t_name = font_card.render(r_cfg["name"][:17], True, (235, 240, 245))
                 screen.blit(t_name, t_name.get_rect(center=(cx + card_w // 2, cy + 170)))
 
                 chk = pygame.Rect(cx + card_w // 2 - 13, cy + 195, 26, 26)
@@ -427,74 +645,61 @@ while programm_run:
                     pygame.draw.rect(screen, (46, 204, 113), chk, border_radius=4)
                     pygame.draw.lines(screen, (255, 255, 255), False, [(chk.x + 5, chk.y + 13), (chk.x + 11, chk.y + 19), (chk.x + 21, chk.y + 7)], 3)
 
-            info_box = pygame.Rect(work_x, 340, 680, 140)
+            info_box = pygame.Rect(work_x, 340, 640, 140)
             pygame.draw.rect(screen, (28, 34, 45), info_box, border_radius=8)
             screen.blit(font_card.render(f"Активный робот: {saved_robots[active_robot_idx]['name']}", True, (46, 204, 113)), (work_x + 20, 360))
             screen.blit(font_card.render(f"Активный пульт: {saved_remotes[active_remote_idx]['name']}", True, (52, 152, 219)), (work_x + 20, 395))
             screen.blit(font_card.render(f"Активное поле: {saved_fields[active_field_idx]['name']}", True, (230, 126, 34)), (work_x + 20, 430))
-
-            btn_go = pygame.Rect(SCR_W - 230, SCR_H - 85, 205, 62)
-            pulse = int(math.sin(pygame.time.get_ticks() * 0.006) * 15)
-            pygame.draw.rect(screen, (36, min(255, 175 + pulse), 78), btn_go, border_radius=6)
-            shim = pygame.Surface((btn_go.w, btn_go.h), pygame.SRCALPHA)
-            go_shimmer_x = (go_shimmer_x + 4.5) % (btn_go.w + 140)
-            sx = go_shimmer_x - 70
-            pygame.draw.polygon(shim, (255, 255, 255, 75), [(sx, 0), (sx + 35, 0), (sx + 10, btn_go.h), (sx - 25, btn_go.h)])
-            screen.blit(shim, btn_go.topleft)
-            pygame.draw.rect(screen, (130, 255, 170), btn_go, 2, border_radius=6)
-            g_t = font_btn.render("GO", True, (255, 255, 255))
-            screen.blit(g_t, g_t.get_rect(center=btn_go.center))
-
-            if btn_go.collidepoint(mouse_pos) and mouse_clicked:
-                game_state = "LOADING"
-                load_start_ticks = pygame.time.get_ticks()
-
-        # -----------------------------------------------------------------
-        # ВКЛАДКА 2: КОНСТРУКТОР РОБОТА (TINKERCAD STYLE)
-        # -----------------------------------------------------------------
-        # ВКЛАДКА 2: КОНСТРУКТОР РОБОТА (TINKERCAD STYLE)
-        # -----------------------------------------------------------------
+        # ВКЛАДКА 2: КОНСТРУКТОР РОБОТА (С ОМНИ-КОЛЕСАМИ ПОД 45°)
         elif menu_tab == "CFG_ROBOT":
             screen.blit(font_title.render("КОНСТРУКТОР РОБОТА // TINKERCAD WORKPLANE", True, (230, 235, 245)), (work_x, 15))
 
-            # СЛЕВА: Блок 1 (Моторы) и Блок 2 (Колеса: обычное и омни)
             left_panel = pygame.Rect(work_x, 60, 210, 510)
             pygame.draw.rect(screen, (30, 37, 48), left_panel, border_radius=8)
 
-            screen.blit(font_card.render("1. МОТОРЫ (Перенос)", True, (240, 195, 20)), (work_x + 15, 72))
-            btn_add_motor = pygame.Rect(work_x + 15, 102, 180, 48)
+            screen.blit(font_card.render("1. МОТОРЫ", True, (240, 195, 20)), (work_x + 15, 72))
+            btn_add_motor = pygame.Rect(work_x + 15, 100, 180, 42)
             pygame.draw.rect(screen, (45, 56, 72), btn_add_motor, border_radius=6)
-            pygame.draw.rect(screen, (240, 195, 20), (work_x + 25, 114, 34, 22), border_radius=3)
-            screen.blit(font_card.render("+ Мотор DC", True, (255, 255, 255)), (work_x + 70, 116))
+            screen.blit(font_card.render("+ Мотор DC", True, (255, 255, 255)), (work_x + 48, 111))
             if btn_add_motor.collidepoint(mouse_pos) and mouse_clicked and len(draft_robot["motors"]) < 8:
                 new_id = len(draft_robot["motors"]) + 1
-                draft_robot["motors"].append({"id": new_id, "x": 0, "y": -44 if new_id % 2 == 1 else 44, "wheel": "none"})
+                draft_robot["motors"].append({"id": new_id, "x": 0, "y": -44 if new_id % 2 == 1 else 44, "wheel": "none", "angle": 0})
                 selected_draft_motor = len(draft_robot["motors"]) - 1
 
-            screen.blit(font_card.render("2. КОЛЕСА (На мотор)", True, (52, 152, 219)), (work_x + 15, 170))
-            btn_w_norm = pygame.Rect(work_x + 15, 200, 180, 46)
-            btn_w_omni = pygame.Rect(work_x + 15, 256, 180, 46)
+            screen.blit(font_card.render("2. КОЛЕСА (На мотор)", True, (52, 152, 219)), (work_x + 15, 158))
+            btn_w_norm = pygame.Rect(work_x + 15, 186, 180, 40)
+            btn_w_omni = pygame.Rect(work_x + 15, 234, 180, 40)
             pygame.draw.rect(screen, (45, 56, 72), btn_w_norm, border_radius=6)
             pygame.draw.rect(screen, (45, 56, 72), btn_w_omni, border_radius=6)
-            screen.blit(font_card.render("Обычное колесо", True, (255, 255, 255)), (work_x + 30, 213))
-            screen.blit(font_card.render("Омни-колесо", True, (130, 220, 255)), (work_x + 42, 269))
+            screen.blit(font_card.render("Обычное колесо", True, (255, 255, 255)), (work_x + 30, 196))
+            screen.blit(font_card.render("Омни-колесо", True, (130, 220, 255)), (work_x + 42, 244))
 
             if selected_draft_motor is not None and selected_draft_motor < len(draft_robot["motors"]):
+                cur_m = draft_robot["motors"][selected_draft_motor]
                 if btn_w_norm.collidepoint(mouse_pos) and mouse_clicked:
-                    draft_robot["motors"][selected_draft_motor]["wheel"] = "normal"
+                    cur_m["wheel"] = "normal"
                 if btn_w_omni.collidepoint(mouse_pos) and mouse_clicked:
-                    draft_robot["motors"][selected_draft_motor]["wheel"] = "omni"
+                    cur_m["wheel"] = "omni"
 
-                btn_del_m = pygame.Rect(work_x + 15, 325, 180, 38)
+                screen.blit(font_card.render(f"Угол колеса: {cur_m.get('angle', 0)}°", True, (46, 204, 113)), (work_x + 15, 290))
+                btn_ang = pygame.Rect(work_x + 15, 316, 180, 38)
+                pygame.draw.rect(screen, (52, 73, 94), btn_ang, border_radius=6)
+                screen.blit(font_card.render("Повернуть на 45°", True, (255, 255, 255)), (work_x + 28, 325))
+                if btn_ang.collidepoint(mouse_pos) and mouse_clicked:
+                    angles_cycle = [0, 45, 90, -45]
+                    cur_a = cur_m.get("angle", 0)
+                    next_idx = (angles_cycle.index(cur_a) + 1) % len(angles_cycle) if cur_a in angles_cycle else 0
+                    cur_m["angle"] = angles_cycle[next_idx]
+
+                btn_del_m = pygame.Rect(work_x + 15, 370, 180, 38)
                 pygame.draw.rect(screen, (180, 50, 50), btn_del_m, border_radius=6)
-                screen.blit(font_card.render("Удалить мотор", True, (255, 255, 255)), (work_x + 35, 334))
+                screen.blit(font_card.render("Удалить мотор", True, (255, 255, 255)), (work_x + 35, 379))
                 if btn_del_m.collidepoint(mouse_pos) and mouse_clicked:
                     draft_robot["motors"].pop(selected_draft_motor)
                     for idx_m, m_item in enumerate(draft_robot["motors"]):
                         m_item["id"] = idx_m + 1
                     selected_draft_motor = None
 
-            # ПО ЦЕНТРУ: Рабочая сетка Tinkercad с платформой и перетаскиванием моторов
             workplane = pygame.Rect(work_x + 225, 60, 430, 510)
             draw_tinkercad_grid(screen, workplane)
             wp_center = workplane.center
@@ -512,19 +717,17 @@ while programm_run:
                     selected_draft_motor = idx_m
                     drag_motor_idx = idx_m
 
-            if drag_motor_idx is not None and mouse_pressed:
+            if drag_motor_idx is not None and mouse_pressed[0]:
                 nx = int((mouse_pos[0] - wp_center[0]) / 1.8)
                 ny = int((mouse_pos[1] - wp_center[1]) / 1.8)
                 draft_robot["motors"][drag_motor_idx]["x"] = max(-65, min(65, nx))
                 draft_robot["motors"][drag_motor_idx]["y"] = max(-65, min(65, ny))
 
-            # СПРАВА: Выбор формы платформы (карточки с галочкой) и кнопка СОХРАНИТЬ
             right_panel = pygame.Rect(work_x + 670, 60, 220, 510)
             pygame.draw.rect(screen, (30, 37, 48), right_panel, border_radius=8)
             screen.blit(font_card.render("Форма платформы:", True, (220, 225, 235)), (right_panel.x + 15, 72))
 
-            shapes_list = [("square", "Квадрат"), ("circle", "Круг"), ("rect", "Прямоуг.")]
-            for s_i, (s_code, s_lbl) in enumerate(shapes_list):
+            for s_i, (s_code, s_lbl) in enumerate([("square", "Квадрат"), ("circle", "Круг"), ("rect", "Прямоуг.")]):
                 s_card = pygame.Rect(right_panel.x + 15, 105 + s_i * 95, 190, 82)
                 is_sh = (draft_robot["shape"] == s_code)
                 pygame.draw.rect(screen, (42, 52, 66), s_card, border_radius=6)
@@ -538,21 +741,19 @@ while programm_run:
 
             btn_save_r = pygame.Rect(right_panel.x + 15, right_panel.bottom - 65, 190, 48)
             pygame.draw.rect(screen, (39, 174, 96), btn_save_r, border_radius=6)
-            screen.blit(font_card.render("СОХРАНИТЬ РОБОТА", True, (255, 255, 255)), (btn_save_r.x + 16, btn_save_r.y + 14))
+            screen.blit(font_card.render("СОХРАНИТЬ В JSON", True, (255, 255, 255)), (btn_save_r.x + 18, btn_save_r.y + 14))
             if btn_save_r.collidepoint(mouse_pos) and mouse_clicked:
                 new_cfg = copy.deepcopy(draft_robot)
                 new_cfg["name"] = f"Кастом Робот #{len(saved_robots) + 1}"
                 saved_robots.append(new_cfg)
                 active_robot_idx = len(saved_robots) - 1
+                save_all_configs()
                 show_toast(f"Сохранено: {new_cfg['name']}")
 
-        # -----------------------------------------------------------------
-        # ВКЛАДКА 3: КОНСТРУКТОР ПУЛЬТА (КНОПКИ И ПРИВЯЗКА К МОТОРАМ)
-        # -----------------------------------------------------------------
+        # ВКЛАДКА 3: КОНСТРУКТОР ПУЛЬТА
         elif menu_tab == "CFG_REMOTE":
             screen.blit(font_title.render("КОНСТРУКТОР ПУЛЬТА // ПРИВЯЗКА К МОТОРАМ", True, (230, 235, 245)), (work_x, 15))
 
-            # Слева: добавление кнопок на пульт
             l_rem = pygame.Rect(work_x, 60, 210, 510)
             pygame.draw.rect(screen, (30, 37, 48), l_rem, border_radius=8)
             btn_add_b = pygame.Rect(work_x + 15, 80, 180, 46)
@@ -562,7 +763,6 @@ while programm_run:
                 draft_remote["buttons"].append({"x": 140, "y": 80, "key": "f", "label": "F", "motor_id": 1, "dir": 1})
                 selected_remote_btn = len(draft_remote["buttons"]) - 1
 
-            # По центру: корпус пульта на сетке Tinkercad
             wp_rem = pygame.Rect(work_x + 225, 60, 430, 510)
             draw_tinkercad_grid(screen, wp_rem)
             pad_rect = pygame.Rect(wp_rem.centerx - 150, wp_rem.centery - 90, 300, 180)
@@ -583,18 +783,16 @@ while programm_run:
                     drag_remote_btn = b_i
                     waiting_key_bind = False
 
-            if drag_remote_btn is not None and mouse_pressed:
+            if drag_remote_btn is not None and mouse_pressed[0]:
                 draft_remote["buttons"][drag_remote_btn]["x"] = max(25, min(275, mouse_pos[0] - pad_rect.x))
                 draft_remote["buttons"][drag_remote_btn]["y"] = max(25, min(155, mouse_pos[1] - pad_rect.y))
 
-            # Справа: меню настройки выбранной кнопки пульта + СОХРАНИТЬ
             r_rem = pygame.Rect(work_x + 670, 60, 220, 510)
             pygame.draw.rect(screen, (30, 37, 48), r_rem, border_radius=8)
             if selected_remote_btn is not None and selected_remote_btn < len(draft_remote["buttons"]):
                 sb = draft_remote["buttons"][selected_remote_btn]
                 screen.blit(font_card.render("Настройка кнопки:", True, (46, 204, 113)), (r_rem.x + 15, 75))
 
-                # Назначить клавишу клавиатуры
                 b_key = pygame.Rect(r_rem.x + 15, 110, 190, 40)
                 pygame.draw.rect(screen, (230, 126, 34) if waiting_key_bind else (50, 62, 80), b_key, border_radius=6)
                 k_str = "Жмите клавишу..." if waiting_key_bind else f"Клавиша: [{sb['label']}]"
@@ -602,7 +800,6 @@ while programm_run:
                 if b_key.collidepoint(mouse_pos) and mouse_clicked:
                     waiting_key_bind = True
 
-                # Выбор мотора (Мотор 1, 2, 3, 4)
                 screen.blit(font_hud.render("Привязать к мотору:", True, (200, 210, 225)), (r_rem.x + 15, 165))
                 for m_num in range(1, 5):
                     bm = pygame.Rect(r_rem.x + 15 + (m_num - 1) * 48, 190, 42, 36)
@@ -611,7 +808,6 @@ while programm_run:
                     if bm.collidepoint(mouse_pos) and mouse_clicked:
                         sb["motor_id"] = m_num
 
-                # Направление вращения (Вперед / Назад)
                 b_dir = pygame.Rect(r_rem.x + 15, 240, 190, 38)
                 pygame.draw.rect(screen, (50, 62, 80), b_dir, border_radius=6)
                 d_str = "Ход: ВПЕРЕД (+)" if sb["dir"] == 1 else "Ход: НАЗАД (-)"
@@ -621,17 +817,16 @@ while programm_run:
 
             btn_save_rem = pygame.Rect(r_rem.x + 15, r_rem.bottom - 65, 190, 48)
             pygame.draw.rect(screen, (39, 174, 96), btn_save_rem, border_radius=6)
-            screen.blit(font_card.render("СОХРАНИТЬ ПУЛЬТ", True, (255, 255, 255)), (btn_save_rem.x + 22, btn_save_rem.y + 14))
+            screen.blit(font_card.render("СОХРАНИТЬ В JSON", True, (255, 255, 255)), (btn_save_rem.x + 18, btn_save_rem.y + 14))
             if btn_save_rem.collidepoint(mouse_pos) and mouse_clicked:
                 new_rem = copy.deepcopy(draft_remote)
                 new_rem["name"] = f"Пульт #{len(saved_remotes) + 1}"
                 saved_remotes.append(new_rem)
                 active_remote_idx = len(saved_remotes) - 1
+                save_all_configs()
                 show_toast(f"Сохранено: {new_rem['name']}")
 
-        # -----------------------------------------------------------------
-        # ВКЛАДКА 4: КОНСТРУКТОР ПОЛЯ (СТЕНЫ И ДВИЖИМЫЕ КУБИКИ)
-        # -----------------------------------------------------------------
+        # ВКЛАДКА 4: КОНСТРУКТОР ПОЛЯ
         elif menu_tab == "CFG_FIELD":
             screen.blit(font_title.render("КОНСТРУКТОР ПОЛЯ // СТЕНЫ И КУБИКИ", True, (230, 235, 245)), (work_x, 15))
 
@@ -652,7 +847,6 @@ while programm_run:
                 draft_field["objects"].append({"x": 500, "y": 300, "w": 42, "h": 42, "type": "box"})
                 selected_field_obj = len(draft_field["objects"]) - 1
 
-            # Смена типа выбранного объекта (Стена <-> Движимый) и поворот 90 град
             if selected_field_obj is not None and selected_field_obj < len(draft_field["objects"]):
                 fo = draft_field["objects"][selected_field_obj]
                 btn_tog = pygame.Rect(work_x + 15, 215, 180, 40)
@@ -668,15 +862,15 @@ while programm_run:
 
             btn_save_fld = pygame.Rect(work_x + 15, l_fld.bottom - 65, 180, 48)
             pygame.draw.rect(screen, (39, 174, 96), btn_save_fld, border_radius=6)
-            screen.blit(font_card.render("СОХРАНИТЬ ПОЛЕ", True, (255, 255, 255)), (btn_save_fld.x + 22, btn_save_fld.y + 14))
+            screen.blit(font_card.render("СОХРАНИТЬ В JSON", True, (255, 255, 255)), (btn_save_fld.x + 14, btn_save_fld.y + 14))
             if btn_save_fld.collidepoint(mouse_pos) and mouse_clicked:
                 new_fld = copy.deepcopy(draft_field)
                 new_fld["name"] = f"Поле #{len(saved_fields) + 1}"
                 saved_fields.append(new_fld)
                 active_field_idx = len(saved_fields) - 1
+                save_all_configs()
                 show_toast(f"Сохранено: {new_fld['name']}")
 
-            # Мини-карта поля (масштаб 0.65 от реального 1000x600)
             map_rect = pygame.Rect(work_x + 230, 90, 650, 390)
             draw_tinkercad_grid(screen, map_rect)
             for f_i, obj in enumerate(draft_field["objects"]):
@@ -699,9 +893,7 @@ while programm_run:
                 draft_field["objects"][drag_field_obj]["x"] = max(0, min(920, nx))
                 draft_field["objects"][drag_field_obj]["y"] = max(0, min(550, ny))
 
-        # -----------------------------------------------------------------
-        # ВКЛАДКА 5 (4-Я КНОПКА): МЕНЕДЖЕР ВСЕХ КОНФИГУРАЦИЙ (3 КОЛОНКИ)
-        # -----------------------------------------------------------------
+        # ВКЛАДКА 5: МЕНЕДЖЕР ВСЕХ КОНФИГУРАЦИЙ
         elif menu_tab == "MANAGER":
             screen.blit(font_title.render("МЕНЕДЖЕР СБОРОК // ВЫБОР ПОЛЯ, РОБОТА И ПУЛЬТА", True, (230, 235, 245)), (work_x, 18))
 
@@ -743,7 +935,60 @@ while programm_run:
                         else:
                             active_remote_idx = it_i
 
-        # Всплывающее уведомление о сохранении
+        # ВКЛАДКА 6: НАСТРОЙКИ ГРАФИКИ (SOURCE 2 / 3D ПОЛЕ / СГЛАЖИВАНИЕ)
+        elif menu_tab == "SETTINGS":
+            screen.blit(font_title.render("НАСТРОЙКИ ДВИЖКА // SOURCE 2 GRAPHICS", True, (230, 235, 245)), (work_x, 22))
+
+            set_box = pygame.Rect(work_x, 85, 560, 320)
+            pygame.draw.rect(screen, (30, 37, 48), set_box, border_radius=10)
+
+            r_3d = pygame.Rect(work_x + 25, 115, 510, 56)
+            pygame.draw.rect(screen, (40, 49, 64), r_3d, border_radius=8)
+            screen.blit(font_card.render("Включить графику 3D (Камера от 1-го лица на роботе)", True, (240, 245, 250)), (r_3d.x + 18, r_3d.y + 18))
+            chk_3d = pygame.Rect(r_3d.right - 48, r_3d.y + 14, 28, 28)
+            pygame.draw.rect(screen, (46, 204, 113) if graphics_settings["mode_3d"] else (20, 25, 32), chk_3d, border_radius=5)
+            if graphics_settings["mode_3d"]:
+                pygame.draw.lines(screen, (255, 255, 255), False, [(chk_3d.x + 6, chk_3d.y + 14), (chk_3d.x + 12, chk_3d.y + 20), (chk_3d.x + 22, chk_3d.y + 8)], 3)
+            if r_3d.collidepoint(mouse_pos) and mouse_clicked:
+                graphics_settings["mode_3d"] = not graphics_settings["mode_3d"]
+
+            r_aa = pygame.Rect(work_x + 25, 190, 510, 56)
+            pygame.draw.rect(screen, (40, 49, 64), r_aa, border_radius=8)
+            screen.blit(font_card.render("Сглаживание текстур и граней (Source 2 Anti-Aliasing)", True, (240, 245, 250)), (r_aa.x + 18, r_aa.y + 18))
+            chk_aa = pygame.Rect(r_aa.right - 48, r_aa.y + 14, 28, 28)
+            pygame.draw.rect(screen, (46, 204, 113) if graphics_settings["antialiasing"] else (20, 25, 32), chk_aa, border_radius=5)
+            if graphics_settings["antialiasing"]:
+                pygame.draw.lines(screen, (255, 255, 255), False, [(chk_aa.x + 6, chk_aa.y + 14), (chk_aa.x + 12, chk_aa.y + 20), (chk_aa.x + 22, chk_aa.y + 8)], 3)
+            if r_aa.collidepoint(mouse_pos) and mouse_clicked:
+                graphics_settings["antialiasing"] = not graphics_settings["antialiasing"]
+
+            r_hd = pygame.Rect(work_x + 25, 265, 510, 56)
+            pygame.draw.rect(screen, (40, 49, 64), r_hd, border_radius=8)
+            screen.blit(font_card.render("Суперсэмплинг HD (Устранение пикселизации 2x)", True, (240, 245, 250)), (r_hd.x + 18, r_hd.y + 18))
+            chk_hd = pygame.Rect(r_hd.right - 48, r_hd.y + 14, 28, 28)
+            pygame.draw.rect(screen, (46, 204, 113) if graphics_settings["hd_supersample"] else (20, 25, 32), chk_hd, border_radius=5)
+            if graphics_settings["hd_supersample"]:
+                pygame.draw.lines(screen, (255, 255, 255), False, [(chk_hd.x + 6, chk_hd.y + 14), (chk_hd.x + 12, chk_hd.y + 20), (chk_hd.x + 22, chk_hd.y + 8)], 3)
+            if r_hd.collidepoint(mouse_pos) and mouse_clicked:
+                graphics_settings["hd_supersample"] = not graphics_settings["hd_supersample"]
+
+        if menu_tab in ("HOME", "PLAY", "MANAGER"):
+            btn_go = pygame.Rect(SCR_W - 230, SCR_H - 85, 205, 62)
+            pulse = int(math.sin(pygame.time.get_ticks() * 0.006) * 15)
+            pygame.draw.rect(screen, (36, min(255, 175 + pulse), 78), btn_go, border_radius=6)
+            shim = pygame.Surface((btn_go.w, btn_go.h), pygame.SRCALPHA)
+            go_shimmer_x = (go_shimmer_x + 4.5) % (btn_go.w + 140)
+            sx = go_shimmer_x - 70
+            pygame.draw.polygon(shim, (255, 255, 255, 75), [(sx, 0), (sx + 35, 0), (sx + 10, btn_go.h), (sx - 25, btn_go.h)])
+            screen.blit(shim, btn_go.topleft)
+            pygame.draw.rect(screen, (130, 255, 170), btn_go, 2, border_radius=6)
+            g_t = font_btn.render("GO", True, (255, 255, 255))
+            screen.blit(g_t, g_t.get_rect(center=btn_go.center))
+
+            if btn_go.collidepoint(mouse_pos) and mouse_clicked:
+                game_state = "LOADING"
+                load_start_ticks = pygame.time.get_ticks()
+
         if toast_text and pygame.time.get_ticks() - toast_timer < 2000:
             t_surf = font_card.render(toast_text, True, (255, 255, 255))
             t_bg = pygame.Rect(SCR_W // 2 - 140, SCR_H - 45, 280, 32)
@@ -782,22 +1027,24 @@ while programm_run:
             game_state = "GAME"
 
     # =====================================================================
-    # ЭКРАН 3: ИГРОВОЕ ПОЛЕ, ФИЗИКА КОЛЕС/ОМНИ-КОЛЕС И ТРАНСЛЯЦИЯ ПУЛЬТА
+    # ЭКРАН 3: ИГРОВОЕ ПОЛЕ (2D / 3D SOURCE 2, ФИЗИКА OMNI 45°, ТАКТИЛЬНЫЙ ПУЛЬТ)
     # =====================================================================
     elif game_state == "GAME":
-        screen.blit(bg_metal_floor, (0, 0))
-
         cur_robot_cfg = saved_robots[active_robot_idx]
         cur_remote_cfg = saved_remotes[active_remote_idx]
 
-        # 1. Отрисовка объектов поля (стены и движимые кубы)
-        for obj in live_field_objects:
-            col_obj = (192, 57, 43) if obj["type"] == "wall" else (230, 126, 34)
-            pygame.draw.rect(screen, col_obj, obj["rect"], border_radius=5)
-            pygame.draw.rect(screen, (255, 255, 255), obj["rect"], 1, border_radius=5)
+        if graphics_settings["mode_3d"]:
+            render_3d_first_person(screen, robot_pos, robot_angle, live_field_objects)
+        else:
+            screen.blit(bg_metal_floor, (0, 0))
+            for obj in live_field_objects:
+                col_obj = (192, 57, 43) if obj["type"] == "wall" else (230, 126, 34)
+                pygame.draw.rect(screen, col_obj, obj["rect"], border_radius=5)
+                pygame.draw.rect(screen, (255, 255, 255), obj["rect"], 1, border_radius=5)
 
-        # 2. Обработка ввода и физика каждого мотора
-        active_keys_now = set()
+        hud_pad = pygame.Rect(SCR_W - 315, SCR_H - 195, 300, 180)
+        active_buttons_now = []
+
         if window_active:
             if keyboard.is_pressed('m'):
                 game_state = "MENU"
@@ -808,76 +1055,101 @@ while programm_run:
                 if keyboard.is_pressed(g_k):
                     current_gear = g_k
 
-            spd = SPEED_MODES[current_gear]
-            forward_vec = pygame.math.Vector2(1, 0).rotate(-robot_angle)
-            strafe_vec = pygame.math.Vector2(0, 1).rotate(-robot_angle)
+        for btn in cur_remote_cfg["buttons"]:
+            bx = hud_pad.x + btn["x"]
+            by = hud_pad.y + btn["y"]
+            b_r = pygame.Rect(bx - 18, by - 18, 36, 36)
 
-            motor_power = {m["id"]: 0.0 for m in cur_robot_cfg["motors"]}
-            tank_turn_cmd = 0.0
-
-            for btn in cur_remote_cfg["buttons"]:
+            key_down = False
+            if window_active:
                 try:
-                    if keyboard.is_pressed(btn["key"]):
-                        active_keys_now.add(btn["key"])
-                        m_id = btn["motor_id"]
-                        if m_id == 0:
-                            for k_m in motor_power:
-                                motor_power[k_m] += spd * btn["dir"]
-                        elif m_id == -1:
-                            tank_turn_cmd += spd * 0.75
-                        elif m_id == -2:
-                            tank_turn_cmd -= spd * 0.75
-                        elif m_id in motor_power:
-                            motor_power[m_id] += spd * btn["dir"]
+                    key_down = keyboard.is_pressed(btn["key"])
                 except Exception:
-                    pass
+                    key_down = False
 
-            net_forward = 0.0
-            net_strafe = 0.0
-            net_torque = tank_turn_cmd
+            mouse_down_btn = mouse_pressed and b_r.collidepoint(mouse_pos)
+            if key_down or mouse_down_btn:
+                active_buttons_now.append(btn)
 
-            for m in cur_robot_cfg["motors"]:
-                if m["wheel"] == "none":
-                    continue
-                pwr = motor_power.get(m["id"], 0.0)
-                if pwr != 0.0:
-                    net_forward += pwr
-                    net_torque += -pwr * (m["y"] / 45.0) * 0.65
-                    if m["wheel"] == "omni":
-                        net_strafe += pwr * (m["x"] / 60.0) * 0.55
+        spd = SPEED_MODES[current_gear]
+        forward_vec = pygame.math.Vector2(1, 0).rotate(-robot_angle)
+        strafe_vec = pygame.math.Vector2(0, 1).rotate(-robot_angle)
 
-            num_wheels = max(1, sum(1 for m in cur_robot_cfg["motors"] if m["wheel"] != "none"))
-            delta_pos = (forward_vec * (net_forward / num_wheels)) + (strafe_vec * (net_strafe / num_wheels))
-            robot_angle += net_torque / num_wheels
+        motor_power = {m["id"]: 0.0 for m in cur_robot_cfg["motors"]}
+        tank_turn_cmd = 0.0
+        strafe_cmd = 0.0
 
-            next_pos = robot_pos + delta_pos
-            robot_hitbox = pygame.Rect(0, 0, 96, 96)
-            robot_hitbox.center = (round(next_pos.x), round(next_pos.y))
+        for btn in active_buttons_now:
+            m_id = btn["motor_id"]
+            if m_id == 0:
+                for k_m in motor_power:
+                    motor_power[k_m] += spd * btn["dir"]
+            elif m_id == -1:
+                tank_turn_cmd += spd * 0.85
+            elif m_id == -2:
+                tank_turn_cmd -= spd * 0.85
+            elif m_id == -3:
+                strafe_cmd -= spd
+            elif m_id == -4:
+                strafe_cmd += spd
+            elif m_id in motor_power:
+                motor_power[m_id] += spd * btn["dir"]
 
-            blocked = False
-            for obj in live_field_objects:
-                if robot_hitbox.colliderect(obj["rect"]):
-                    if obj["type"] == "wall":
-                        blocked = True
-                    elif obj["type"] == "box":
-                        obj["rect"].x += round(delta_pos.x)
-                        obj["rect"].y += round(delta_pos.y)
-                        obj["rect"].clamp_ip(pygame.Rect(0, 0, SCR_W, SCR_H))
+        net_fwd = 0.0
+        net_str = strafe_cmd
+        net_rot = tank_turn_cmd
 
-            if not blocked:
-                robot_pos = next_pos
-                robot_pos.x = max(50, min(SCR_W - 50, robot_pos.x))
-                robot_pos.y = max(50, min(SCR_H - 50, robot_pos.y))
+        for m in cur_robot_cfg["motors"]:
+            if m["wheel"] == "none":
+                continue
+            pwr = motor_power.get(m["id"], 0.0)
+            if pwr != 0.0:
+                ang_rad = math.radians(m.get("angle", 0))
+                if m["wheel"] == "omni":
+                    f_x = math.cos(ang_rad) * pwr
+                    f_y = math.sin(ang_rad) * pwr
+                    net_fwd += f_x
+                    net_str += f_y
+                    torque = (m["x"] * f_y - m["y"] * f_x) / 45.0
+                    net_rot -= torque * 0.75
+                else:
+                    f_x = math.cos(ang_rad) * pwr
+                    net_fwd += f_x
+                    net_rot -= pwr * (m["y"] / 45.0) * 0.75
 
-        # 3. Отрисовка робота на поле
-        r_base_surf = render_robot_config_surface(cur_robot_cfg, 1.0)
-        r_rot_surf = pygame.transform.rotate(r_base_surf, robot_angle)
-        screen.blit(r_rot_surf, r_rot_surf.get_rect(center=(round(robot_pos.x), round(robot_pos.y))))
+        num_w = max(1, sum(1 for m in cur_robot_cfg["motors"] if m["wheel"] != "none"))
+        delta_pos = (forward_vec * (net_fwd / num_w)) + (strafe_vec * (net_str / num_w))
+        robot_angle += net_rot / num_w
 
-        # 4. ТРАНСЛЯЦИЯ ПУЛЬТА В ПРАВОМ НИЖНЕМ УГЛУ ПОЛЯ
-        hud_pad = pygame.Rect(SCR_W - 315, SCR_H - 195, 300, 180)
+        next_pos = robot_pos + delta_pos
+        robot_hitbox = pygame.Rect(0, 0, 92, 92)
+        robot_hitbox.center = (round(next_pos.x), round(next_pos.y))
+
+        blocked = False
+        for obj in live_field_objects:
+            if robot_hitbox.colliderect(obj["rect"]):
+                if obj["type"] == "wall":
+                    blocked = True
+                elif obj["type"] == "box":
+                    obj["rect"].x += round(delta_pos.x)
+                    obj["rect"].y += round(delta_pos.y)
+                    obj["rect"].clamp_ip(pygame.Rect(0, 0, SCR_W, SCR_H))
+
+        if not blocked:
+            robot_pos = next_pos
+            robot_pos.x = max(50, min(SCR_W - 50, robot_pos.x))
+            robot_pos.y = max(50, min(SCR_H - 50, robot_pos.y))
+
+        if not graphics_settings["mode_3d"]:
+            r_base_surf = render_robot_config_surface(cur_robot_cfg, 1.0)
+            if graphics_settings["antialiasing"]:
+                r_rot_surf = pygame.transform.rotozoom(r_base_surf, robot_angle, 1.0)
+            else:
+                r_rot_surf = pygame.transform.rotate(r_base_surf, robot_angle)
+            screen.blit(r_rot_surf, r_rot_surf.get_rect(center=(round(robot_pos.x), round(robot_pos.y))))
+
         pad_surf = pygame.Surface((hud_pad.w, hud_pad.h), pygame.SRCALPHA)
-        pygame.draw.rect(pad_surf, (20, 25, 34, 210), (0, 0, hud_pad.w, hud_pad.h), border_radius=14)
+        pygame.draw.rect(pad_surf, (20, 25, 34, 215), (0, 0, hud_pad.w, hud_pad.h), border_radius=14)
         pygame.draw.rect(pad_surf, (70, 90, 115, 240), (0, 0, hud_pad.w, hud_pad.h), 2, border_radius=14)
         screen.blit(pad_surf, hud_pad.topleft)
 
@@ -885,19 +1157,20 @@ while programm_run:
             bx = hud_pad.x + btn["x"]
             by = hud_pad.y + btn["y"]
             b_r = pygame.Rect(bx - 18, by - 18, 36, 36)
-            is_pressed_now = btn["key"] in active_keys_now
-            pygame.draw.rect(screen, (46, 204, 113) if is_pressed_now else (45, 55, 70), b_r, border_radius=7)
+            is_act_b = btn in active_buttons_now
+            draw_r = b_r.move(0, 2) if is_act_b else b_r
+            pygame.draw.rect(screen, (46, 204, 113) if is_act_b else (45, 55, 70), draw_r, border_radius=7)
+            pygame.draw.rect(screen, (130, 255, 170) if is_act_b else (85, 100, 120), draw_r, 1, border_radius=7)
             t_b = font_hud.render(btn["label"], True, (255, 255, 255))
-            screen.blit(t_b, t_b.get_rect(center=b_r.center))
+            screen.blit(t_b, t_b.get_rect(center=draw_r.center))
 
-        # Верхняя строка статуса
+        mode_tag = "3D SOURCE 2" if graphics_settings["mode_3d"] else "2D TOP-DOWN"
         top_hud = font_hud.render(
-            f"Робот: {cur_robot_cfg['name']} | Пульт: {cur_remote_cfg['name']} | Скор: {current_gear} (1-3) | [Z] Сброс | [M] Меню",
-            True, (210, 220, 235)
+            f"[{mode_tag}] Робот: {cur_robot_cfg['name']} | Скор: {current_gear} (1-3) | [Z] Сброс | [M] Меню",
+            True, (215, 225, 240)
         )
         screen.blit(top_hud, (15, 15))
 
-    # Выход по двойному ESC при активном окне
     now = pygame.time.get_ticks()
     if window_active and (now - last_key_time > 250):
         if keyboard.is_pressed('esc'):
